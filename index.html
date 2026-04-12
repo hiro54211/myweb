@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ani记录</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <!-- 顶部导航栏 -->
+    <nav class="top-nav">
+        <div class="nav-logo">
+            <i class="fas fa-book-open nav-logo-icon"></i>
+            <span>ani记录</span>
+        </div>
+        <div class="nav-actions">
+            <button id="btnAddAnime" class="btn-nav" style="display: none;">
+                <i class="fas fa-plus"></i> 新增
+            </button>
+            <button id="btnLogin" class="btn-nav">
+                <i class="fas fa-lock"></i> 验证身份
+            </button>
+        </div>
+    </nav>
+
+    <!-- 主布局 -->
+    <div class="main-layout">
+        <!-- 左侧边栏 -->
+        <aside class="sidebar">
+            <div class="sidebar-section">
+                <div class="sidebar-title">年份索引</div>
+                <ul class="sidebar-menu" id="yearSidebarMenu">
+                    <li class="sidebar-item">
+                        <a href="#" class="sidebar-link active" data-year="all">
+                            <i class="fas fa-list sidebar-icon"></i>
+                            <span>全部</span>
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </aside>
+
+        <!-- 主内容区 -->
+        <main class="main-content">
+            <!-- 页面标题 -->
+            <header class="page-header">
+                <h1 class="page-title">感想录</h1>
+                <p class="page-subtitle">记录各个季度的体验</p>
+            </header>
+
+            <!-- 提示框 -->
+            <div class="alert-box">
+                <div class="alert-header">
+                    <i class="fas fa-exclamation-triangle alert-icon"></i>
+                    <span>温馨提示</span>
+                </div>
+                <div class="alert-content">
+                    <ul>
+                        <li>所有人都可以发表评论，分享你的看法</li>
+                        <li>编辑感想内容需要验证身份</li>
+                        <li>验证身份后可以新增动漫栏目</li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- 动漫列表 -->
+            <section class="content-section">
+                <div class="section-header">
+                    <h2 class="section-title">动漫感想</h2>
+                </div>
+                <div class="anime-list" id="animeList">
+                    <!-- 空栏目 1 -->
+                    <article class="anime-card empty-card" data-anime-id="1">
+                        <div class="anime-header">
+                            <div class="anime-title-section">
+                                <h3 class="anime-title">空栏目 1</h3>
+                                <div class="anime-meta">
+                                    <span class="anime-rating"><i class="fas fa-star"></i> 待评分</span>
+                                    <span class="anime-year"><i class="fas fa-calendar"></i> 待填写</span>
+                                </div>
+                            </div>
+                            <div class="anime-actions">
+                                <button class="btn-icon btn-edit-anime" data-anime-id="1" title="编辑">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="anime-tags">
+                            <span class="tag">待添加标签</span>
+                        </div>
+                        <div class="anime-cover-container">
+                            <div class="anime-cover empty-cover">
+                                <i class="fas fa-image"></i>
+                                <span>暂无封面</span>
+                            </div>
+                        </div>
+                        <div class="anime-review">
+                            <p>点击编辑按钮添加内容...</p>
+                        </div>
+                        <div class="comments-section">
+                            <div class="comments-header">
+                                <i class="fas fa-comments"></i>
+                                <span>评论区</span>
+                            </div>
+                            <div class="comments-list" id="comments-1">
+                                <div class="empty-comments">暂无评论，快来发表你的看法吧！</div>
+                            </div>
+                            <form class="comment-form" data-anime-id="1">
+                                <input type="text" class="comment-input" placeholder="写下你的评论..." required>
+                                <button type="submit" class="btn-comment">
+                                    <i class="fas fa-paper-plane"></i> 发送
+                                </button>
+                            </form>
+                        </div>
+                    </article>
+
+                    <!-- 空栏目 2 -->
+                    <article class="anime-card empty-card" data-anime-id="2">
+                        <div class="anime-header">
+                            <div class="anime-title-section">
+                                <h3 class="anime-title">空栏目 2</h3>
+                                <div class="anime-meta">
+                                    <span class="anime-rating"><i class="fas fa-star"></i> 待评分</span>
+                                    <span class="anime-year"><i class="fas fa-calendar"></i> 待填写</span>
+                                </div>
+                            </div>
+                            <div class="anime-actions">
+                                <button class="btn-icon btn-edit-anime" data-anime-id="2" title="编辑">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="anime-tags">
+                            <span class="tag">待添加标签</span>
+                        </div>
+                        <div class="anime-cover-container">
+                            <div class="anime-cover empty-cover">
+                                <i class="fas fa-image"></i>
+                                <span>暂无封面</span>
+                            </div>
+                        </div>
+                        <div class="anime-review">
+                            <p>点击编辑按钮添加内容...</p>
+                        </div>
+                        <div class="comments-section">
+                            <div class="comments-header">
+                                <i class="fas fa-comments"></i>
+                                <span>评论区</span>
+                            </div>
+                            <div class="comments-list" id="comments-2">
+                                <div class="empty-comments">暂无评论，快来发表你的看法吧！</div>
+                            </div>
+                            <form class="comment-form" data-anime-id="2">
+                                <input type="text" class="comment-input" placeholder="写下你的评论..." required>
+                                <button type="submit" class="btn-comment">
+                                    <i class="fas fa-paper-plane"></i> 发送
+                                </button>
+                            </form>
+                        </div>
+                    </article>
+
+                    <!-- 空栏目 3 -->
+                    <article class="anime-card empty-card" data-anime-id="3">
+                        <div class="anime-header">
+                            <div class="anime-title-section">
+                                <h3 class="anime-title">空栏目 3</h3>
+                                <div class="anime-meta">
+                                    <span class="anime-rating"><i class="fas fa-star"></i> 待评分</span>
+                                    <span class="anime-year"><i class="fas fa-calendar"></i> 待填写</span>
+                                </div>
+                            </div>
+                            <div class="anime-actions">
+                                <button class="btn-icon btn-edit-anime" data-anime-id="3" title="编辑">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="anime-tags">
+                            <span class="tag">待添加标签</span>
+                        </div>
+                        <div class="anime-cover-container">
+                            <div class="anime-cover empty-cover">
+                                <i class="fas fa-image"></i>
+                                <span>暂无封面</span>
+                            </div>
+                        </div>
+                        <div class="anime-review">
+                            <p>点击编辑按钮添加内容...</p>
+                        </div>
+                        <div class="comments-section">
+                            <div class="comments-header">
+                                <i class="fas fa-comments"></i>
+                                <span>评论区</span>
+                            </div>
+                            <div class="comments-list" id="comments-3">
+                                <div class="empty-comments">暂无评论，快来发表你的看法吧！</div>
+                            </div>
+                            <form class="comment-form" data-anime-id="3">
+                                <input type="text" class="comment-input" placeholder="写下你的评论..." required>
+                                <button type="submit" class="btn-comment">
+                                    <i class="fas fa-paper-plane"></i> 发送
+                                </button>
+                            </form>
+                        </div>
+                    </article>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- 密码验证弹窗 -->
+    <div id="passwordModal" class="modal-overlay">
+        <div class="modal-box">
+            <div class="modal-icon">
+                <i class="fas fa-lock"></i>
+            </div>
+            <h2 class="modal-title">验证身份</h2>
+            <p class="modal-hint">请输入密码以编辑感想或新增栏目</p>
+            <form id="passwordForm" class="password-form">
+                <input type="password" id="passwordInput" class="password-input" placeholder="请输入密码" required>
+                <p id="passwordError" class="password-error">密码错误，请重试</p>
+                <button type="submit" class="btn-modal">验证</button>
+            </form>
+            <button id="cancelPassword" class="btn-modal-cancel">取消</button>
+        </div>
+    </div>
+
+    <!-- 编辑弹窗 -->
+    <div id="editModal" class="edit-modal">
+        <div class="edit-modal-content">
+            <span class="close-btn" id="closeEditBtn">
+                <i class="fas fa-times"></i>
+            </span>
+            <h2 id="editModalTitle">编辑感想</h2>
+            <form id="editAnimeForm" class="edit-form">
+                <input type="hidden" id="editAnimeId">
+                <div class="form-group">
+                    <label for="editTitle">动漫名称</label>
+                    <input type="text" id="editTitle" required>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="editRating">评分</label>
+                        <select id="editRating" required>
+                            <option value="10">10分 - 神作</option>
+                            <option value="9">9分 - 优秀</option>
+                            <option value="8">8分 - 推荐</option>
+                            <option value="7">7分 - 不错</option>
+                            <option value="6">6分 - 一般</option>
+                            <option value="5">5分 - 及格</option>
+                            <option value="4">4分 - 较差</option>
+                            <option value="3">3分 - 不推荐</option>
+                            <option value="2">2分 - 很差</option>
+                            <option value="1">1分 - 极差</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="editYear">观看年份</label>
+                        <input type="number" id="editYear" min="1980" max="2099" placeholder="例如：2024" required>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="editTags">标签（用逗号分隔）</label>
+                    <input type="text" id="editTags" placeholder="热血, 战斗, 神作" required>
+                </div>
+                <div class="form-group">
+                    <label for="editCover">封面图片</label>
+                    <div class="cover-upload-area">
+                        <input type="file" id="editCover" accept="image/*" style="display: none;">
+                        <div class="cover-preview" id="coverPreview">
+                            <div class="cover-placeholder">
+                                <i class="fas fa-cloud-upload-alt"></i>
+                                <span>点击上传封面图片</span>
+                            </div>
+                        </div>
+                        <button type="button" class="btn-upload" onclick="document.getElementById('editCover').click()">
+                            <i class="fas fa-upload"></i> 选择图片
+                        </button>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="editReview">感想内容</label>
+                    <textarea id="editReview" placeholder="写下你的感想..." required></textarea>
+                </div>
+                <button type="submit" class="btn-primary">
+                    <i class="fas fa-save"></i> 保存修改
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
