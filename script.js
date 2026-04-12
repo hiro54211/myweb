@@ -7,15 +7,33 @@ let currentEditingAnimeId = null;
 let currentFilterYear = 'all';
 let currentCoverData = null;
 
-// 数据存储
-let animeData = {};
-let commentsData = {};
+// Firebase 相关变量
+let db = null;
+let firebaseModules = null;
+
+// 等待 Firebase 初始化
+function waitForFirebase() {
+    return new Promise((resolve) => {
+        const check = () => {
+            if (window.db && window.firebaseModules) {
+                db = window.db;
+                firebaseModules = window.firebaseModules;
+                resolve();
+            } else {
+                setTimeout(check, 100);
+            }
+        };
+        check();
+    });
+}
 
 // 初始化
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', async function() {
+    await waitForFirebase();
     loadData();
     bindEvents();
     updateYearSidebar();
+    setupRealtimeListeners();
 });
 
 // 绑定事件
@@ -61,6 +79,90 @@ function bindEvents() {
 
     // 封面上传
     document.getElementById('editCover').addEventListener('change', handleCoverUpload);
+}
+
+// 设置实时监听器
+function setupRealtimeListeners() {
+    const { collection, onSnapshot } = firebaseModules;
+    
+    // 监听动漫数据变化
+    onSnapshot(collection(db, 'anime'), (snapshot) => {
+        snapshot.docChanges().forEach((change) => {
+            const data = change.doc.data();
+            const animeId = change.doc.id;
+            
+            if (change.type === 'added' || change.type === 'modified') {
+                updateAnimeCard(animeId, data);
+            }
+        });
+    });
+
+    // 监听评论数据变化
+    onSnapshot(collection(db, 'comments'), (snapshot) => {
+        snapshot.docChanges().forEach((change) => {
+            const data = change.doc.data();
+            const animeId = change.doc.id;
+            
+            if (change.type === 'added' || change.type === 'modified') {
+                updateCommentsList(animeId, data.comments || []);
+            }
+        });
+    });
+}
+
+// 更新动漫卡片
+function updateAnimeCard(animeId, data) {
+    const card = document.querySelector(`[data-anime-id="${animeId}"]`);
+    if (!card || card.dataset.updating === 'true') return;
+
+    card.classList.remove('empty-card');
+    card.dataset.year = data.year || '';
+    
+    card.querySelector('.anime-title').textContent = data.title || '未命名';
+    card.querySelector('.anime-rating').innerHTML = `<i class="fas fa-star"></i> ${data.rating || '0'}分`;
+    card.querySelector('.anime-year').innerHTML = `<i class="fas fa-calendar"></i> ${data.year || '未知'}年`;
+    
+    const tags = data.tags || '';
+    card.querySelector('.anime-tags').innerHTML = tags.split(',').filter(t => t.trim()).map(t => `<span class="tag">${t.trim()}</span>`).join('');
+    
+    const review = data.review || '';
+    card.querySelector('.anime-review').innerHTML = review.split('\n').filter(p => p.trim()).map(p => `<p>${p.trim()}</p>`).join('');
+
+    // 更新封面
+    if (data.cover) {
+        const coverContainer = card.querySelector('.anime-cover-container');
+        coverContainer.innerHTML = `
+            <div class="anime-cover">
+                <img src="${data.cover}" alt="${data.title}封面">
+            </div>
+        `;
+    }
+
+    updateYearSidebar();
+}
+
+// 更新评论列表
+function updateCommentsList(animeId, comments) {
+    const commentsList = document.getElementById(`comments-${animeId}`);
+    if (!commentsList) return;
+
+    // 清空现有评论
+    commentsList.innerHTML = '';
+
+    if (comments.length === 0) {
+        commentsList.innerHTML = '<div class="empty-comments">暂无评论，快来发表你的看法吧！</div>';
+        return;
+    }
+
+    comments.forEach(comment => {
+        const commentItem = document.createElement('div');
+        commentItem.className = 'comment-item';
+        commentItem.innerHTML = `
+            <div class="comment-content">${escapeHtml(comment.content)}</div>
+            <div class="comment-time">${new Date(comment.time).toLocaleString()}</div>
+        `;
+        commentsList.appendChild(commentItem);
+    });
 }
 
 // 打开密码弹窗
@@ -111,7 +213,7 @@ function handleEditClick(e) {
 }
 
 // 打开编辑弹窗
-function openEditModal(animeId) {
+async function openEditModal(animeId) {
     const card = document.querySelector(`[data-anime-id="${animeId}"]`);
     const title = card.querySelector('.anime-title').textContent;
     const ratingText = card.querySelector('.anime-rating').textContent;
@@ -123,17 +225,20 @@ function openEditModal(animeId) {
     currentCoverData = null;
 
     document.getElementById('editAnimeId').value = animeId;
-    document.getElementById('editTitle').value = title;
+    document.getElementById('editTitle').value = title === '空栏目 1' || title === '空栏目 2' || title === '空栏目 3' || title === '新栏目' ? '' : title;
     document.getElementById('editRating').value = ratingText.match(/\d+/) ? ratingText.match(/\d+/)[0] : '8';
     document.getElementById('editYear').value = yearText.match(/\d+/) ? yearText.match(/\d+/)[0] : new Date().getFullYear();
-    document.getElementById('editTags').value = tags;
-    document.getElementById('editReview').value = review;
+    document.getElementById('editTags').value = tags === '待添加标签' ? '' : tags;
+    document.getElementById('editReview').value = review === '点击编辑按钮添加内容...' ? '' : review;
 
     // 设置封面预览
     const coverPreview = document.getElementById('coverPreview');
-    if (animeData[animeId] && animeData[animeId].cover) {
-        coverPreview.innerHTML = `<img src="${animeData[animeId].cover}" alt="封面">`;
-        currentCoverData = animeData[animeId].cover;
+    const { doc, getDoc } = firebaseModules;
+    const docSnap = await getDoc(doc(db, 'anime', animeId));
+    
+    if (docSnap.exists() && docSnap.data().cover) {
+        coverPreview.innerHTML = `<img src="${docSnap.data().cover}" alt="封面">`;
+        currentCoverData = docSnap.data().cover;
     } else {
         coverPreview.innerHTML = `
             <div class="cover-placeholder">
@@ -173,50 +278,38 @@ function handleCoverUpload(e) {
 }
 
 // 保存编辑
-function handleSaveEdit(e) {
+async function handleSaveEdit(e) {
     e.preventDefault();
 
     const animeId = document.getElementById('editAnimeId').value;
-    const title = document.getElementById('editTitle').value;
+    const title = document.getElementById('editTitle').value || '未命名';
     const rating = document.getElementById('editRating').value;
     const year = document.getElementById('editYear').value;
     const tags = document.getElementById('editTags').value;
     const review = document.getElementById('editReview').value;
 
     const card = document.querySelector(`[data-anime-id="${animeId}"]`);
-    card.classList.remove('empty-card');
-    card.dataset.year = year;
+    card.dataset.updating = 'true';
 
-    card.querySelector('.anime-title').textContent = title;
-    card.querySelector('.anime-rating').innerHTML = `<i class="fas fa-star"></i> ${rating}分`;
-    card.querySelector('.anime-year').innerHTML = `<i class="fas fa-calendar"></i> ${year}年`;
+    // 保存到 Firestore
+    const { doc, setDoc } = firebaseModules;
+    await setDoc(doc(db, 'anime', animeId), {
+        title,
+        rating,
+        year,
+        tags,
+        review,
+        cover: currentCoverData,
+        updatedAt: new Date().toISOString()
+    });
 
-    const tagsContainer = card.querySelector('.anime-tags');
-    tagsContainer.innerHTML = tags.split(',').map(t => `<span class="tag">${t.trim()}</span>`).join('');
-
-    const reviewContainer = card.querySelector('.anime-review');
-    reviewContainer.innerHTML = review.split('\n').filter(p => p.trim()).map(p => `<p>${p.trim()}</p>`).join('');
-
-    // 更新封面
-    const coverContainer = card.querySelector('.anime-cover-container');
-    if (currentCoverData) {
-        coverContainer.innerHTML = `
-            <div class="anime-cover">
-                <img src="${currentCoverData}" alt="${title}封面">
-            </div>
-        `;
-    }
-
-    animeData[animeId] = { title, rating, year, tags, review, cover: currentCoverData };
-    saveData();
-    updateYearSidebar();
-
+    delete card.dataset.updating;
     closeEditModal();
     showNotification('保存成功！', 'success');
 }
 
 // 处理添加评论
-function handleAddComment(e) {
+async function handleAddComment(e) {
     e.preventDefault();
     const animeId = e.target.dataset.animeId;
     const input = e.target.querySelector('.comment-input');
@@ -224,25 +317,28 @@ function handleAddComment(e) {
 
     if (!content) return;
 
-    const commentsList = document.getElementById(`comments-${animeId}`);
-    const emptyMsg = commentsList.querySelector('.empty-comments');
-    if (emptyMsg) emptyMsg.remove();
+    const { doc, getDoc, setDoc } = firebaseModules;
+    const commentData = {
+        content: content,
+        time: new Date().toISOString()
+    };
 
-    const commentId = Date.now();
-    const commentItem = document.createElement('div');
-    commentItem.className = 'comment-item';
-    commentItem.dataset.commentId = commentId;
-    commentItem.innerHTML = `
-        <div class="comment-content">${escapeHtml(content)}</div>
-        <div class="comment-time">${new Date().toLocaleString()}</div>
-    `;
+    // 获取现有评论
+    const docRef = doc(db, 'comments', animeId);
+    const docSnap = await getDoc(docRef);
+    let comments = [];
+    
+    if (docSnap.exists()) {
+        comments = docSnap.data().comments || [];
+    }
+    
+    comments.push(commentData);
 
-    commentsList.appendChild(commentItem);
+    // 保存到 Firestore
+    await setDoc(docRef, { comments });
+
     input.value = '';
-
-    if (!commentsData[animeId]) commentsData[animeId] = [];
-    commentsData[animeId].push({ id: commentId, content, time: new Date().toISOString() });
-    saveData();
+    showNotification('评论已发布！', 'success');
 }
 
 // 新增栏目
@@ -253,7 +349,7 @@ function handleAddNewAnime() {
     }
 
     const animeList = document.getElementById('animeList');
-    const newId = Date.now();
+    const newId = Date.now().toString();
 
     const newCard = document.createElement('article');
     newCard.className = 'anime-card empty-card';
@@ -331,9 +427,6 @@ function updateYearSidebar() {
         const year = card.dataset.year;
         if (year) years.add(year);
     });
-    for (let id in animeData) {
-        if (animeData[id].year) years.add(animeData[id].year);
-    }
 
     const sortedYears = Array.from(years).sort((a, b) => b - a);
     const sidebarMenu = document.getElementById('yearSidebarMenu');
@@ -377,62 +470,22 @@ function escapeHtml(text) {
     return div.innerHTML;
 }
 
-// 数据持久化
-function saveData() {
-    localStorage.setItem('animeData', JSON.stringify(animeData));
-    localStorage.setItem('commentsData', JSON.stringify(commentsData));
-}
+// 数据持久化（Firestore）
+async function loadData() {
+    const { collection, getDocs } = firebaseModules;
+    
+    // 加载动漫数据
+    const animeSnapshot = await getDocs(collection(db, 'anime'));
+    animeSnapshot.forEach((doc) => {
+        updateAnimeCard(doc.id, doc.data());
+    });
 
-function loadData() {
-    const savedAnime = localStorage.getItem('animeData');
-    const savedComments = localStorage.getItem('commentsData');
-
-    if (savedAnime) {
-        animeData = JSON.parse(savedAnime);
-        Object.keys(animeData).forEach(id => {
-            const data = animeData[id];
-            const card = document.querySelector(`[data-anime-id="${id}"]`);
-            if (card) {
-                card.classList.remove('empty-card');
-                card.dataset.year = data.year;
-                card.querySelector('.anime-title').textContent = data.title;
-                card.querySelector('.anime-rating').innerHTML = `<i class="fas fa-star"></i> ${data.rating}分`;
-                card.querySelector('.anime-year').innerHTML = `<i class="fas fa-calendar"></i> ${data.year}年`;
-                card.querySelector('.anime-tags').innerHTML = data.tags.split(',').map(t => `<span class="tag">${t.trim()}</span>`).join('');
-                card.querySelector('.anime-review').innerHTML = data.review.split('\n').filter(p => p.trim()).map(p => `<p>${p.trim()}</p>`).join('');
-
-                // 加载封面
-                if (data.cover) {
-                    const coverContainer = card.querySelector('.anime-cover-container');
-                    coverContainer.innerHTML = `
-                        <div class="anime-cover">
-                            <img src="${data.cover}" alt="${data.title}封面">
-                        </div>
-                    `;
-                }
-            }
-        });
-    }
-
-    if (savedComments) {
-        commentsData = JSON.parse(savedComments);
-        Object.keys(commentsData).forEach(animeId => {
-            const commentsList = document.getElementById(`comments-${animeId}`);
-            if (commentsList && commentsData[animeId].length > 0) {
-                const emptyMsg = commentsList.querySelector('.empty-comments');
-                if (emptyMsg) emptyMsg.remove();
-
-                commentsData[animeId].forEach(comment => {
-                    const commentItem = document.createElement('div');
-                    commentItem.className = 'comment-item';
-                    commentItem.dataset.commentId = comment.id;
-                    commentItem.innerHTML = `
-                        <div class="comment-content">${escapeHtml(comment.content)}</div>
-                        <div class="comment-time">${new Date(comment.time).toLocaleString()}</div>
-                    `;
-                    commentsList.appendChild(commentItem);
-                });
-            }
-        });
-    }
+    // 加载评论数据
+    const commentsSnapshot = await getDocs(collection(db, 'comments'));
+    commentsSnapshot.forEach((doc) => {
+        const data = doc.data();
+        if (data.comments) {
+            updateCommentsList(doc.id, data.comments);
+        }
+    });
 }
