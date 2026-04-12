@@ -362,7 +362,7 @@ async function handleAddComment(e) {
 }
 
 // 新增栏目
-function handleAddNewAnime() {
+async function handleAddNewAnime() {
     if (!isAuthenticated) {
         showNotification('请先验证身份', 'error');
         return;
@@ -370,6 +370,23 @@ function handleAddNewAnime() {
 
     const animeList = document.getElementById('animeList');
     const newId = Date.now().toString();
+
+    // 先保存到 Firestore
+    const { doc, setDoc } = firebaseModules;
+    await setDoc(doc(db, 'anime', newId), {
+        title: '新栏目',
+        rating: '',
+        year: '',
+        tags: '待添加标签',
+        review: '点击编辑按钮添加内容...',
+        cover: null,
+        updatedAt: new Date().toISOString()
+    });
+
+    // 创建评论文档
+    await setDoc(doc(db, 'comments', newId), {
+        comments: []
+    });
 
     const newCard = document.createElement('article');
     newCard.className = 'anime-card empty-card';
@@ -490,9 +507,46 @@ function escapeHtml(text) {
     return div.innerHTML;
 }
 
+// 初始化空栏目到 Firebase
+async function initializeEmptyCards() {
+    const { doc, getDoc, setDoc } = firebaseModules;
+    const emptyCards = document.querySelectorAll('.anime-card.empty-card');
+    
+    for (const card of emptyCards) {
+        const animeId = card.dataset.animeId;
+        const docRef = doc(db, 'anime', animeId);
+        const docSnap = await getDoc(docRef);
+        
+        // 如果 Firebase 中没有这个文档，创建它
+        if (!docSnap.exists()) {
+            await setDoc(docRef, {
+                title: `空栏目 ${animeId}`,
+                rating: '',
+                year: '',
+                tags: '待添加标签',
+                review: '点击编辑按钮添加内容...',
+                cover: null,
+                updatedAt: new Date().toISOString()
+            });
+            
+            // 创建评论文档
+            const commentsRef = doc(db, 'comments', animeId);
+            const commentsSnap = await getDoc(commentsRef);
+            if (!commentsSnap.exists()) {
+                await setDoc(commentsRef, {
+                    comments: []
+                });
+            }
+        }
+    }
+}
+
 // 数据持久化（Firestore）
 async function loadData() {
     const { collection, getDocs } = firebaseModules;
+    
+    // 先初始化空栏目
+    await initializeEmptyCards();
     
     // 加载动漫数据
     const animeSnapshot = await getDocs(collection(db, 'anime'));
