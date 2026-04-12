@@ -10,14 +10,18 @@ let currentCoverData = null;
 // Firebase 相关变量
 let db = null;
 let firebaseModules = null;
+let auth = null;
+let signInAnonymously = null;
 
 // 等待 Firebase 初始化
 function waitForFirebase() {
     return new Promise((resolve) => {
         const check = () => {
-            if (window.db && window.firebaseModules) {
+            if (window.db && window.firebaseModules && window.auth && window.signInAnonymously) {
                 db = window.db;
                 firebaseModules = window.firebaseModules;
+                auth = window.auth;
+                signInAnonymously = window.signInAnonymously;
                 resolve();
             } else {
                 setTimeout(check, 100);
@@ -27,13 +31,29 @@ function waitForFirebase() {
     });
 }
 
+// 匿名登录
+async function anonymousSignIn() {
+    try {
+        const userCredential = await signInAnonymously(auth);
+        console.log('匿名登录成功:', userCredential.user.uid);
+        return true;
+    } catch (error) {
+        console.error('匿名登录失败:', error);
+        showNotification('连接服务器失败，请刷新重试', 'error');
+        return false;
+    }
+}
+
 // 初始化
 document.addEventListener('DOMContentLoaded', async function() {
     await waitForFirebase();
-    loadData();
-    bindEvents();
-    updateYearSidebar();
-    setupRealtimeListeners();
+    const signedIn = await anonymousSignIn();
+    if (signedIn) {
+        loadData();
+        bindEvents();
+        updateYearSidebar();
+        setupRealtimeListeners();
+    }
 });
 
 // 绑定事件

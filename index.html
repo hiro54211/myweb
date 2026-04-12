@@ -10,6 +10,7 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
         import { getFirestore, collection, doc, getDoc, setDoc, onSnapshot, query, orderBy } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+        import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyDQw8e63J7ZfIFOQ2K74MEPJ2GIn4VNKRg",
@@ -22,6 +23,8 @@
 
         const app = initializeApp(firebaseConfig);
         window.db = getFirestore(app);
+        window.auth = getAuth(app);
+        window.signInAnonymously = signInAnonymously;
         window.firebaseModules = { collection, doc, getDoc, setDoc, onSnapshot, query, orderBy };
     </script>
 </head>
