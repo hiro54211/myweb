@@ -26,14 +26,14 @@ document.addEventListener('DOMContentLoaded', async function() {
 
 // JSONBin API 请求
 async function jsonbinApi(method = 'GET', body = null) {
-    const url = `https://api.jsonbin.io/v3/b/${jsonbinConfig.binId}`;
+    const url = `https://api.jsonbin.io/v3/b/${jsonbinConfig.binId}/latest`;
     const headers = {
         'X-Master-Key': jsonbinConfig.apiKey,
         'Content-Type': 'application/json'
     };
     
     const options = { method, headers };
-    if (body) {
+    if (body && method !== 'GET') {
         options.body = JSON.stringify(body);
     }
     
@@ -74,7 +74,21 @@ async function loadData() {
 // 保存数据到 JSONBin
 async function saveData() {
     try {
-        await jsonbinApi('PUT', dataCache);
+        const url = `https://api.jsonbin.io/v3/b/${jsonbinConfig.binId}`;
+        const headers = {
+            'X-Master-Key': jsonbinConfig.apiKey,
+            'Content-Type': 'application/json'
+        };
+        
+        const response = await fetch(url, {
+            method: 'PUT',
+            headers: headers,
+            body: JSON.stringify(dataCache)
+        });
+        
+        if (!response.ok) {
+            throw new Error(`JSONBin API error: ${response.status}`);
+        }
         return true;
     } catch (error) {
         console.error('保存数据失败:', error);
