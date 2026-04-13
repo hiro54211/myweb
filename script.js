@@ -28,7 +28,7 @@ document.addEventListener('DOMContentLoaded', async function() {
 async function jsonbinApi(method = 'GET', body = null) {
     const url = `https://api.jsonbin.io/v3/b/${jsonbinConfig.binId}/latest`;
     const headers = {
-        'X-Access-Key': jsonbinConfig.apiKey,
+        'X-Master-Key': jsonbinConfig.apiKey,
         'Content-Type': 'application/json'
     };
     
@@ -81,7 +81,7 @@ async function saveData() {
     try {
         const url = `https://api.jsonbin.io/v3/b/${jsonbinConfig.binId}`;
         const headers = {
-            'X-Access-Key': jsonbinConfig.apiKey,
+            'X-Master-Key': jsonbinConfig.apiKey,
             'Content-Type': 'application/json'
         };
         
