@@ -7,53 +7,21 @@ let currentEditingAnimeId = null;
 let currentFilterYear = 'all';
 let currentCoverData = null;
 
-// Firebase 相关变量
-let db = null;
-let firebaseModules = null;
-let auth = null;
-let signInAnonymously = null;
-
-// 等待 Firebase 初始化
-function waitForFirebase() {
-    return new Promise((resolve) => {
-        const check = () => {
-            if (window.db && window.firebaseModules && window.auth && window.signInAnonymously) {
-                db = window.db;
-                firebaseModules = window.firebaseModules;
-                auth = window.auth;
-                signInAnonymously = window.signInAnonymously;
-                resolve();
-            } else {
-                setTimeout(check, 100);
-            }
-        };
-        check();
-    });
-}
-
-// 匿名登录
-async function anonymousSignIn() {
-    try {
-        const userCredential = await signInAnonymously(auth);
-        console.log('匿名登录成功:', userCredential.user.uid);
-        return true;
-    } catch (error) {
-        console.error('匿名登录失败:', error);
-        showNotification('连接服务器失败，请刷新重试', 'error');
-        return false;
-    }
-}
+// Supabase 客户端
+let supabaseClient = null;
 
 // 初始化
 document.addEventListener('DOMContentLoaded', async function() {
-    await waitForFirebase();
-    const signedIn = await anonymousSignIn();
-    if (signedIn) {
-        loadData();
-        bindEvents();
-        updateYearSidebar();
-        setupRealtimeListeners();
+    supabaseClient = window.supabase;
+    if (!supabaseClient) {
+        showNotification('数据库连接失败，请刷新重试', 'error');
+        return;
     }
+    
+    await loadData();
+    bindEvents();
+    updateYearSidebar();
+    setupRealtimeListeners();
 });
 
 // 绑定事件
@@ -103,31 +71,41 @@ function bindEvents() {
 
 // 设置实时监听器
 function setupRealtimeListeners() {
-    const { collection, onSnapshot } = firebaseModules;
-    
     // 监听动漫数据变化
-    onSnapshot(collection(db, 'anime'), (snapshot) => {
-        snapshot.docChanges().forEach((change) => {
-            const data = change.doc.data();
-            const animeId = change.doc.id;
-            
-            if (change.type === 'added' || change.type === 'modified') {
-                updateAnimeCard(animeId, data);
+    supabaseClient
+        .channel('anime-changes')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'anime' }, (payload) => {
+            if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
+                updateAnimeCard(payload.new.id, payload.new);
             }
-        });
-    });
+        })
+        .subscribe();
 
     // 监听评论数据变化
-    onSnapshot(collection(db, 'comments'), (snapshot) => {
-        snapshot.docChanges().forEach((change) => {
-            const data = change.doc.data();
-            const animeId = change.doc.id;
-            
-            if (change.type === 'added' || change.type === 'modified') {
-                updateCommentsList(animeId, data.comments || []);
+    supabaseClient
+        .channel('comments-changes')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'comments' }, (payload) => {
+            if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
+                loadCommentsForAnime(payload.new.anime_id);
             }
-        });
-    });
+        })
+        .subscribe();
+}
+
+// 加载评论
+async function loadCommentsForAnime(animeId) {
+    const { data, error } = await supabaseClient
+        .from('comments')
+        .select('*')
+        .eq('anime_id', animeId)
+        .order('created_at', { ascending: true });
+    
+    if (error) {
+        console.error('加载评论失败:', error);
+        return;
+    }
+    
+    updateCommentsList(animeId, data || []);
 }
 
 // 更新动漫卡片
@@ -179,7 +157,7 @@ function updateCommentsList(animeId, comments) {
         commentItem.className = 'comment-item';
         commentItem.innerHTML = `
             <div class="comment-content">${escapeHtml(comment.content)}</div>
-            <div class="comment-time">${new Date(comment.time).toLocaleString()}</div>
+            <div class="comment-time">${new Date(comment.created_at).toLocaleString()}</div>
         `;
         commentsList.appendChild(commentItem);
     });
@@ -235,11 +213,22 @@ function handleEditClick(e) {
 // 打开编辑弹窗
 async function openEditModal(animeId) {
     const card = document.querySelector(`[data-anime-id="${animeId}"]`);
-    const title = card.querySelector('.anime-title').textContent;
-    const ratingText = card.querySelector('.anime-rating').textContent;
-    const yearText = card.querySelector('.anime-year').textContent;
-    const tags = Array.from(card.querySelectorAll('.tag')).map(t => t.textContent).join(', ');
-    const review = card.querySelector('.anime-review').innerHTML.replace(/<p>/g, '').replace(/<\/p>/g, '\n').trim();
+    if (!card) {
+        showNotification('找不到该栏目', 'error');
+        return;
+    }
+
+    const titleEl = card.querySelector('.anime-title');
+    const ratingEl = card.querySelector('.anime-rating');
+    const yearEl = card.querySelector('.anime-year');
+    const tagsEl = card.querySelector('.anime-tags');
+    const reviewEl = card.querySelector('.anime-review');
+
+    const title = titleEl ? titleEl.textContent : '';
+    const ratingText = ratingEl ? ratingEl.textContent : '';
+    const yearText = yearEl ? yearEl.textContent : '';
+    const tags = tagsEl ? Array.from(tagsEl.querySelectorAll('.tag')).map(t => t.textContent).join(', ') : '';
+    const review = reviewEl ? reviewEl.innerHTML.replace(/<p>/g, '').replace(/<\/p>/g, '\n').trim() : '';
 
     // 重置封面数据
     currentCoverData = null;
@@ -253,12 +242,19 @@ async function openEditModal(animeId) {
 
     // 设置封面预览
     const coverPreview = document.getElementById('coverPreview');
-    const { doc, getDoc } = firebaseModules;
-    const docSnap = await getDoc(doc(db, 'anime', animeId));
+    const { data, error } = await supabaseClient
+        .from('anime')
+        .select('cover')
+        .eq('id', animeId)
+        .single();
     
-    if (docSnap.exists() && docSnap.data().cover) {
-        coverPreview.innerHTML = `<img src="${docSnap.data().cover}" alt="封面">`;
-        currentCoverData = docSnap.data().cover;
+    if (error) {
+        console.error('获取封面失败:', error);
+    }
+    
+    if (data && data.cover) {
+        coverPreview.innerHTML = `<img src="${data.cover}" alt="封面">`;
+        currentCoverData = data.cover;
     } else {
         coverPreview.innerHTML = `
             <div class="cover-placeholder">
@@ -311,17 +307,26 @@ async function handleSaveEdit(e) {
     const card = document.querySelector(`[data-anime-id="${animeId}"]`);
     card.dataset.updating = 'true';
 
-    // 保存到 Firestore
-    const { doc, setDoc } = firebaseModules;
-    await setDoc(doc(db, 'anime', animeId), {
-        title,
-        rating,
-        year,
-        tags,
-        review,
-        cover: currentCoverData,
-        updatedAt: new Date().toISOString()
-    });
+    // 保存到 Supabase
+    const { error } = await supabaseClient
+        .from('anime')
+        .upsert({
+            id: animeId,
+            title,
+            rating,
+            year,
+            tags,
+            review,
+            cover: currentCoverData,
+            updated_at: new Date().toISOString()
+        });
+
+    if (error) {
+        console.error('保存失败:', error);
+        showNotification('保存失败，请重试', 'error');
+        delete card.dataset.updating;
+        return;
+    }
 
     delete card.dataset.updating;
     closeEditModal();
@@ -337,28 +342,25 @@ async function handleAddComment(e) {
 
     if (!content) return;
 
-    const { doc, getDoc, setDoc } = firebaseModules;
-    const commentData = {
-        content: content,
-        time: new Date().toISOString()
-    };
+    const { error } = await supabaseClient
+        .from('comments')
+        .insert({
+            anime_id: animeId,
+            content: content,
+            created_at: new Date().toISOString()
+        });
 
-    // 获取现有评论
-    const docRef = doc(db, 'comments', animeId);
-    const docSnap = await getDoc(docRef);
-    let comments = [];
-    
-    if (docSnap.exists()) {
-        comments = docSnap.data().comments || [];
+    if (error) {
+        console.error('评论失败:', error);
+        showNotification('评论发布失败', 'error');
+        return;
     }
-    
-    comments.push(commentData);
-
-    // 保存到 Firestore
-    await setDoc(docRef, { comments });
 
     input.value = '';
     showNotification('评论已发布！', 'success');
+    
+    // 重新加载评论
+    await loadCommentsForAnime(animeId);
 }
 
 // 新增栏目
@@ -371,22 +373,25 @@ async function handleAddNewAnime() {
     const animeList = document.getElementById('animeList');
     const newId = Date.now().toString();
 
-    // 先保存到 Firestore
-    const { doc, setDoc } = firebaseModules;
-    await setDoc(doc(db, 'anime', newId), {
-        title: '新栏目',
-        rating: '',
-        year: '',
-        tags: '待添加标签',
-        review: '点击编辑按钮添加内容...',
-        cover: null,
-        updatedAt: new Date().toISOString()
-    });
+    // 先保存到 Supabase
+    const { error } = await supabaseClient
+        .from('anime')
+        .insert({
+            id: newId,
+            title: '新栏目',
+            rating: '',
+            year: '',
+            tags: '待添加标签',
+            review: '点击编辑按钮添加内容...',
+            cover: null,
+            updated_at: new Date().toISOString()
+        });
 
-    // 创建评论文档
-    await setDoc(doc(db, 'comments', newId), {
-        comments: []
-    });
+    if (error) {
+        console.error('创建栏目失败:', error);
+        showNotification('创建失败，请重试', 'error');
+        return;
+    }
 
     const newCard = document.createElement('article');
     newCard.className = 'anime-card empty-card';
@@ -437,10 +442,15 @@ async function handleAddNewAnime() {
 
     animeList.appendChild(newCard);
 
+    // 绑定事件
     newCard.querySelector('.btn-edit-anime').addEventListener('click', handleEditClick);
     newCard.querySelector('.comment-form').addEventListener('submit', handleAddComment);
 
-    openEditModal(newId);
+    // 延迟打开编辑弹窗
+    setTimeout(() => {
+        openEditModal(newId);
+    }, 100);
+
     showNotification('新栏目已添加', 'success');
 }
 
@@ -507,59 +517,86 @@ function escapeHtml(text) {
     return div.innerHTML;
 }
 
-// 初始化空栏目到 Firebase
+// 初始化空栏目到 Supabase
 async function initializeEmptyCards() {
-    const { doc, getDoc, setDoc } = firebaseModules;
     const emptyCards = document.querySelectorAll('.anime-card.empty-card');
     
     for (const card of emptyCards) {
         const animeId = card.dataset.animeId;
-        const docRef = doc(db, 'anime', animeId);
-        const docSnap = await getDoc(docRef);
         
-        // 如果 Firebase 中没有这个文档，创建它
-        if (!docSnap.exists()) {
-            await setDoc(docRef, {
-                title: `空栏目 ${animeId}`,
-                rating: '',
-                year: '',
-                tags: '待添加标签',
-                review: '点击编辑按钮添加内容...',
-                cover: null,
-                updatedAt: new Date().toISOString()
-            });
-            
-            // 创建评论文档
-            const commentsRef = doc(db, 'comments', animeId);
-            const commentsSnap = await getDoc(commentsRef);
-            if (!commentsSnap.exists()) {
-                await setDoc(commentsRef, {
-                    comments: []
+        // 检查是否已存在
+        const { data, error } = await supabaseClient
+            .from('anime')
+            .select('id')
+            .eq('id', animeId)
+            .single();
+        
+        if (error && error.code !== 'PGRST116') {
+            console.error('检查栏目失败:', error);
+            continue;
+        }
+        
+        // 如果不存在，创建它
+        if (!data) {
+            const { error: insertError } = await supabaseClient
+                .from('anime')
+                .insert({
+                    id: animeId,
+                    title: `空栏目 ${animeId}`,
+                    rating: '',
+                    year: '',
+                    tags: '待添加标签',
+                    review: '点击编辑按钮添加内容...',
+                    cover: null,
+                    updated_at: new Date().toISOString()
                 });
+            
+            if (insertError) {
+                console.error('初始化栏目失败:', insertError);
             }
         }
     }
 }
 
-// 数据持久化（Firestore）
+// 数据持久化（Supabase）
 async function loadData() {
-    const { collection, getDocs } = firebaseModules;
-    
     // 先初始化空栏目
     await initializeEmptyCards();
     
     // 加载动漫数据
-    const animeSnapshot = await getDocs(collection(db, 'anime'));
-    animeSnapshot.forEach((doc) => {
-        updateAnimeCard(doc.id, doc.data());
+    const { data: animeData, error: animeError } = await supabaseClient
+        .from('anime')
+        .select('*');
+    
+    if (animeError) {
+        console.error('加载动漫数据失败:', animeError);
+        return;
+    }
+    
+    animeData.forEach((item) => {
+        updateAnimeCard(item.id, item);
     });
 
     // 加载评论数据
-    const commentsSnapshot = await getDocs(collection(db, 'comments'));
-    commentsSnapshot.forEach((doc) => {
-        const data = doc.data();
-        if (data.comments) {
-            updateCommentsList(doc.id, data.comments);
+    const { data: commentsData, error: commentsError } = await supabaseClient
+        .from('comments')
+        .select('*');
+    
+    if (commentsError) {
+        console.error('加载评论失败:', commentsError);
+        return;
+    }
+    
+    // 按 anime_id 分组评论
+    const commentsByAnime = {};
+    commentsData.forEach(comment => {
+        if (!commentsByAnime[comment.anime_id]) {
+            commentsByAnime[comment.anime_id] = [];
         }
+        commentsByAnime[comment.anime_id].push(comment);
+    });
+    
+    Object.keys(commentsByAnime).forEach(animeId => {
+        updateCommentsList(animeId, commentsByAnime[animeId]);
     });
 }

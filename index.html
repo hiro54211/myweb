@@ -6,26 +6,12 @@
     <title>ani记录</title>
     <link rel="stylesheet" href="style.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <!-- Firebase SDK -->
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-        import { getFirestore, collection, doc, getDoc, setDoc, onSnapshot, query, orderBy } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
-        import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
-
-        const firebaseConfig = {
-            apiKey: "AIzaSyDQw8e63J7ZfIFOQ2K74MEPJ2GIn4VNKRg",
-            authDomain: "flutter-ai-playground-87432.firebaseapp.com",
-            projectId: "flutter-ai-playground-87432",
-            storageBucket: "flutter-ai-playground-87432.firebasestorage.app",
-            messagingSenderId: "822023824266",
-            appId: "1:822023824266:web:bc3a0e4e76660f4f3e1e73"
-        };
-
-        const app = initializeApp(firebaseConfig);
-        window.db = getFirestore(app);
-        window.auth = getAuth(app);
-        window.signInAnonymously = signInAnonymously;
-        window.firebaseModules = { collection, doc, getDoc, setDoc, onSnapshot, query, orderBy };
+    <!-- Supabase SDK -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.0/dist/umd/supabase.min.js"></script>
+    <script>
+        const SUPABASE_URL = 'https://uwfwhcqkyortkybofr.supabase.co';
+        const SUPABASE_KEY = 'sb_publishable_wWXz9G-cibH4EfXEqQVkVQ_15xRkstv';
+        window.supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
     </script>
 </head>
 <body>
