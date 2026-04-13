@@ -28,7 +28,7 @@ document.addEventListener('DOMContentLoaded', async function() {
 async function jsonbinApi(method = 'GET', body = null) {
     const url = `https://api.jsonbin.io/v3/b/${jsonbinConfig.binId}/latest`;
     const headers = {
-        'X-Master-Key': jsonbinConfig.apiKey,
+        'X-Access-Key': jsonbinConfig.apiKey,
         'Content-Type': 'application/json'
     };
     
@@ -39,7 +39,9 @@ async function jsonbinApi(method = 'GET', body = null) {
     
     const response = await fetch(url, options);
     if (!response.ok) {
-        throw new Error(`JSONBin API error: ${response.status}`);
+        const errorText = await response.text();
+        console.error('API 错误响应:', errorText);
+        throw new Error(`JSONBin API error: ${response.status} - ${errorText}`);
     }
     return response.json();
 }
@@ -79,7 +81,7 @@ async function saveData() {
     try {
         const url = `https://api.jsonbin.io/v3/b/${jsonbinConfig.binId}`;
         const headers = {
-            'X-Master-Key': jsonbinConfig.apiKey,
+            'X-Access-Key': jsonbinConfig.apiKey,
             'Content-Type': 'application/json'
         };
         
@@ -90,6 +92,8 @@ async function saveData() {
         });
         
         if (!response.ok) {
+            const errorText = await response.text();
+            console.error('API 错误响应:', errorText);
             throw new Error(`JSONBin API error: ${response.status}`);
         }
         return true;
