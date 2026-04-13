@@ -47,7 +47,9 @@ async function jsonbinApi(method = 'GET', body = null) {
 // 加载数据
 async function loadData() {
     try {
+        console.log('正在加载数据，Bin ID:', jsonbinConfig.binId);
         const result = await jsonbinApi('GET');
+        console.log('加载成功:', result);
         
         if (result && result.record) {
             dataCache = result.record;
@@ -67,7 +69,8 @@ async function loadData() {
         
     } catch (error) {
         console.error('加载数据失败:', error);
-        showNotification('加载数据失败，使用本地数据', 'error');
+        console.error('错误详情:', error.message);
+        showNotification('加载数据失败: ' + error.message, 'error');
     }
 }
 
